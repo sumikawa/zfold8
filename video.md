@@ -98,6 +98,8 @@ Cast セッションを開始・復帰するときは、受信機が取得でき
 
 Cast 中の位置は受信機からの進捗を正本にして保存する。一時停止中の端末プレーヤーが古い位置を保存し、受信機の進捗を上書きしないよう、対象メディアと再生先を識別する。巻き戻しも有効な更新として扱い、値の大小だけで古い情報を判断しない。セッション終了時は最後に確認できた受信機位置を端末へ同期し、その後で Cast 中の保護を解除する。更新間隔や保存先は製品の要件に合わせる。
 
+Cast の進捗・状態・終了コールバックから、画面消灯中やアプリが背後にあるときに `startService()` や `startForegroundService()` を繰り返さない。Android のバックグラウンド起動制限で例外が発生すると、受信機の再生が続いていても送信側アプリがクラッシュし得る。進捗の保存はサービスの新規起動に依存させず、既に稼働中の再生サービスへ安全に渡す。サービスがない場合も新たに起動せず、保存可能な状態を維持する。`RemoteMediaClient.ProgressListener` に加え、非同期の `load()` 結果、`SessionManagerListener`、通知やタイマーからの起動経路も調べる。Cast 終了時には最後の受信機位置を保存し、Cast 中の状態を解除する。
+
 Cast 中は端末側のローカルタイムバーを隠し、受信機位置を示す Cast 用シークバーだけを同じ場所に表示する。二つのバーを重ねない。Cast 用シークバーにも左右・下端の Window Insets を反映し、シーク操作は受信機へ送る。Cast セッションの開始・終了と再生先の変更時に、表示するバーと現在位置を切り替える。
 
 接続先の選択、ロードの受付、受信機側の再生開始、進捗、切断を別々に記録する。Cast ボタンが表示されたことやロード API の成功だけで、テレビでの再生を検証済みとしない。
@@ -105,6 +107,8 @@ Cast 中は端末側のローカルタイムバーを隠し、受信機位置を
 ## Bluetooth 設定と音声出力先切替の入口を設ける
 
 動画の操作部には、Bluetooth 設定を開くボタンと、システムのメディア出力先画面を開くボタンを設ける。Cast の接続先を選ぶ `MediaRouteButton` は別の操作として扱う。前二者は画面を開く入口であり、押しただけで出力先は変わらない。Cast 用ボタンを端末内の出力先切替ボタンとして流用しない。動画の通常・全画面・半開き表示では両ボタンを利用できるようにし、ミニプレーヤーや音声詳細にも置く製品ではアイコン、順序、`contentDescription` をそろえる。素材は 24 dp 程度でも、各ボタンの操作領域は 48 dp 以上とし、コントローラーの表示・非表示と Insets に連動させる。
+
+Cast SDK の `CastButtonFactory.setUpMediaRouteButton()` で設定したボタンにも、アプリ共通の `MediaRouterParams` が作用する。共通設定で `setOutputSwitcherEnabled(true)` を有効にすると、Cast ボタンから端末の出力先画面が開く構成がある。Cast ボタンを置く場合は `setOutputSwitcherEnabled(false)` を基本とし、端末内の出力先画面は専用ボタンから `MediaRouter2.showSystemOutputSwitcher()` を呼ぶ。AndroidX MediaRouter を出力先画面の代替入口として併用する場合は、そのための設定変更が共通の Cast ボタンへ波及しないか実機で確認する。両ボタンを押し分け、Cast の接続先選択と端末・Bluetooth の出力先画面がそれぞれ開くことを完了条件にする。
 
 Bluetooth 設定への入口には `Settings.ACTION_BLUETOOTH_SETTINGS` を使う。遷移先を確認してから起動し、開けない場合は利用者に知らせる。設定から戻っても再生サービスとプレーヤーを作り直さず、再生状態と UI を同期する。設定画面を開くこと自体には Bluetooth のスキャン権限は不要だが、アプリ内で探索や接続も行う場合は別途権限と実装を検討する。
 
@@ -159,7 +163,7 @@ DeX ではシステムの出力先画面がアプリの外部ウィンドウで�
 - **操作**: シーク、全画面切替と解除、システム戻る、アイコンと読み上げ文言、タッチ・マウス・キーボードの操作を確認する。
 - **コントローラーの配置と表示**: 開いた縦画面を含む各構成で、採用した時間移動・Cast・PIP・全画面が見え、時刻・タイムバー・システム UI と重ならないことを確認する。コントローラー生成直後、Controller 接続後、再生準備完了後、姿勢変更後、映像領域タップ後も表示と活性状態を調べる。標準操作との重複や、画面外へ押し出されたボタンがないことも確かめる。
 - **PIP**: 開始・復帰・再生継続と追加操作が、同じ再生サービスへ届く。
-- **Cast**: 実際の受信機で接続、再生、項目切替、シーク、進捗保存、切断後の位置を確認する。認証付き URL の場合は失効と再取得も試す。
+- **Cast**: 実際の受信機で接続、再生、項目切替、シーク、進捗保存、切断後の位置を確認する。Cast ボタンから Cast 接続先、端末内の出力先ボタンからシステム出力先画面が開くことを別々に確かめる。画面消灯後も受信機の音声・映像と進捗が続き、`BackgroundServiceStartNotAllowedException` などのサービス起動例外がないことをログで確認する。復帰・切断後に古い端末側の位置で上書きされないことも調べる。認証付き URL の場合は失効と再取得も試す。
 - **折りたたみと外部表示**: 表示先と姿勢の確認は [display.md](display.md) に従う。開いた内側画面の縦向きでは、映像が安全領域の上端にあり、直下から下端までの独立した操作領域に中央操作、タイムバー、時刻、補助操作が収まることを確認する。水平な半開きでも映像が上・操作が下の同じ関係になる。内側画面の横向きと山型で使う横向きのカバー画面では上下分割しない。姿勢を切り替えても古い映像寸法が残らず、操作が折り目やシステム UI と重ならないことを目視する。
 - **Bluetooth 設定と音声出力先切替**: 動画の通常・全画面・半開き表示で両ボタンを操作し、Bluetooth 設定、システムの出力先画面、Cast の各ボタンが目的の画面を開くか確認する。端末スピーカーと利用する Bluetooth 機器で、候補表示、選択後の実際の音、出力先画面の表示位置、音量、設定から戻った後の再生位置を確認する。必要なら選択ルートとその音量、`RoutingController` の音量、`AudioManager.STREAM_MUSIC` の値を同時に記録する。画面表示の成功や Bluetooth 接続表示だけで転送成功とみなさない。機器切断時の自動一時停止を求める製品では、`ACTION_AUDIO_BECOMING_NOISY` とルート変更監視を別途検証する。
 
@@ -180,4 +184,4 @@ DeX ではシステムの出力先画面がアプリの外部ウィンドウで�
 
 実装時は、使用する Media3、WindowManager、Android SDK、Cast Sender SDK の版に合う公式 API 文書も確認する。このガイドで判断できない仕様は、対象プロジェクトの要件と実機の再現結果に戻って決める。
 
-参照先: [WindowInfoTracker の API](https://developer.android.com/reference/androidx/window/layout/WindowInfoTracker)、[WindowManager Extensions の状態定義](https://source.android.com/docs/core/display/windowmanager-extensions)、[Media3 の PlayerView API](https://developer.android.com/reference/androidx/media3/ui/PlayerView)、[Media3 の UI 構成](https://developer.android.com/media/media3/ui/playerview)、[Media3 のバックグラウンド再生](https://developer.android.com/media/media3/session/background-playback)、[PIP の実装](https://developer.android.com/develop/ui/views/picture-in-picture)、[折りたたみ端末への対応](https://developer.android.com/develop/adaptive-apps/guides/foldables/make-your-app-fold-aware)、[MediaRouter2 の API](https://developer.android.com/reference/android/media/MediaRouter2)、[Bluetooth 設定の Intent](https://developer.android.com/reference/android/provider/Settings#ACTION_BLUETOOTH_SETTINGS)、[Google Cast Sender の統合](https://developers.google.com/cast/docs/android_sender/integrate)。
+参照先: [WindowInfoTracker の API](https://developer.android.com/reference/androidx/window/layout/WindowInfoTracker)、[WindowManager Extensions の状態定義](https://source.android.com/docs/core/display/windowmanager-extensions)、[Media3 の PlayerView API](https://developer.android.com/reference/androidx/media3/ui/PlayerView)、[Media3 の UI 構成](https://developer.android.com/media/media3/ui/playerview)、[Media3 のバックグラウンド再生](https://developer.android.com/media/media3/session/background-playback)、[バックグラウンドからのサービス起動制限](https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start)、[PIP の実装](https://developer.android.com/develop/ui/views/picture-in-picture)、[折りたたみ端末への対応](https://developer.android.com/develop/adaptive-apps/guides/foldables/make-your-app-fold-aware)、[MediaRouter2 の API](https://developer.android.com/reference/android/media/MediaRouter2)、[Bluetooth 設定の Intent](https://developer.android.com/reference/android/provider/Settings#ACTION_BLUETOOTH_SETTINGS)、[Google Cast Sender の統合](https://developers.google.com/cast/docs/android_sender/integrate)。
