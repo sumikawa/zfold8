@@ -10,7 +10,7 @@
 
 - [display.md](display.md): 内側画面、カバー画面、外部表示、DeX の表示先を見分け、縦横や折り目に応じてレイアウトを切り替えるための共通指針。姿勢変更後の配置の復元と Window Insets も扱う。
 - [dex.md](dex.md): Samsung DeX のウィンドウ表示、マウス・キーボード操作、端末側トラックパッドの向き、実機での確認方法を扱う。
-- [video.md](video.md): Media3 による動画再生、画面内の操作配置、全画面、PIP、Cast、音声出力先切替を扱う。折りたたみ時の表示先判定には `display.md` も使う。
+- [video.md](video.md): Media3 による動画再生、画面内の操作配置、動画・音声プレーヤーの標準アイコン、全画面、PIP、Cast、音声出力先切替を扱う。折りたたみ時の表示先判定には `display.md` も使う。
 - [dropbox.md](dropbox.md): Dropbox の認証、ファイル一覧、版を確認した読取・保存・変更、動画用の一時リンク、APK の受け渡しを扱う。
 - [emacs.md](emacs.md): Android の物理キーボードで Emacs 風の編集操作を実装する際のキーイベント、IME・DeX との競合、編集状態と実機確認を扱う。
 
